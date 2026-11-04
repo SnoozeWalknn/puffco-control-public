@@ -48,7 +48,10 @@ page.on('pageerror', e => errors.push('pageerror: ' + e));
 /* handshake.local.js is gitignored and absent on a fresh clone; its 404 is
  * expected and is not a page fault. */
 page.on('console', m => {
-  if (m.type() === 'error' && !/handshake\.local\.js/.test(m.text())) errors.push('console: ' + m.text());
+  if (m.type() !== 'error') return;
+  const where = m.location()?.url || '';
+  if (/handshake\.local\.js/.test(where) || /handshake\.local\.js/.test(m.text())) return;
+  errors.push('console: ' + m.text() + (where ? ' @ ' + where : ''));
 });
 
 await page.goto(APP_URL);
