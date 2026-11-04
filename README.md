@@ -48,12 +48,13 @@ That is HTTPS, so it loads on any phone. For it to reach your Peak, run this on
 the machine that has the Bluetooth radio, on the same Wi-Fi:
 
 ```bash
-.venv/bin/python tools/tunnel.py --addr <YOUR-PEAK-MAC>
+.venv/bin/python tools/tunnel.py --addr <YOUR-PEAK-MAC> --lan
 ```
 
-Open the URL it prints and add `?bridge=1` — the page then talks to your bridge
-instead of the browser's Bluetooth stack. That is what makes it work on Linux,
-and on phones that block Web Bluetooth from plain HTTP.
+Open the URL it prints — it already carries `?bridge=1` and the access token, so
+the page talks to your bridge instead of the browser's Bluetooth stack. That is
+what makes it work on Linux, and on phones that block Web Bluetooth from plain
+HTTP.
 
 ## Run it locally
 
@@ -74,9 +75,16 @@ Edge, or Bluefy on iOS. "Try the simulator" works anywhere, including `file://`.
 | Phone via a tunnel (`https://…`) | yes | anyone with the URL can *use* the page, so only run it on a network you trust |
 | `file://` | simulator only | no secure context, so no Bluetooth |
 
-To use it on the phone, either trust a local certificate or run a tunnel for the
-session and stop it afterwards. **The tunnel has no authentication** and proxies
-the bridge socket, so it hands full device control to anyone on the network.
+To use it on the phone, run the tunnel for the session and stop it afterwards:
+
+```bash
+.venv/bin/python tools/tunnel.py --addr <MAC> --lan
+```
+
+It prints a URL carrying a **per-run access token**. The token is required for
+every file and for the WebSocket upgrade that proxies the bridge, and it is
+remembered in a session cookie so the page's own scripts load. Without `--lan`
+it binds loopback only; reach it over SSH instead.
 
 ## Tests
 
@@ -85,6 +93,9 @@ node ui/test_curve.mjs     # 39 — curve maths, planning, safety envelope
 node ui/test_lorax.mjs     # 17 — framing, auth gate, typed I/O, sequencing
 node ui/e2e.mjs            # 48 — real browser: connect → session → curve → abort
 node ui/real-smoke.mjs <MAC>   # browser → bridge → device, never heats
+node ui/tunnel-smoke.mjs <base> <token> <MAC>   # browser → gated tunnel → device
+node ui/pages-check.mjs        # the deployed Pages build boots and connects
+python3 tools/test_tunnel.py   # 13 — token gate, cookie, traversal
 node ui/hw-curve.mjs <MAC>     # one curve on hardware, with a verdict
 node ui/demo_curve.mjs hill 20   # visual: commanded vs simulated chamber
 node ui/shots.mjs          # screenshots into ui/shots/ (server on 8791)

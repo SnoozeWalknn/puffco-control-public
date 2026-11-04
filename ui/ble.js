@@ -172,11 +172,17 @@ export class BleTransport {
  * as they speak to BleTransport.
  */
 /* Same origin by default so a tunnel can serve the page and the bridge together;
- * ?port= still overrides for a local bridge on a different port. */
-const _bport = new URLSearchParams(location.search).get('port') || 8792;
-const _bhost = new URLSearchParams(location.search).get('bhost')
+ * ?port= still overrides for a local bridge on a different port.
+ *
+ * ?t= is the tunnel's access token. It has to be carried into the WebSocket
+ * URL as well: the tunnel gates the upgrade, so a page that opens fine would
+ * still be unable to reach the device without it. */
+const _bp = new URLSearchParams(location.search);
+const _bport = _bp.get('port') || 8792;
+const _bhost = _bp.get('bhost')
   || (location.protocol === 'https:' && !location.port ? location.hostname : (location.hostname || '127.0.0.1'));
-export const BRIDGE_URL = `ws://${_bhost}:${_bport}`;
+const _btoken = _bp.get('t');
+export const BRIDGE_URL = `ws://${_bhost}:${_bport}${_btoken ? '/?t=' + encodeURIComponent(_btoken) : ''}`;
 
 export function bridgeAvailable() {
   return new URLSearchParams(location.search).has('bridge');

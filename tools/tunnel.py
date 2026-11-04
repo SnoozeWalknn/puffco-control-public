@@ -12,9 +12,14 @@ Why this exists rather than `http.server --bind 0.0.0.0`:
 
 Open the printed URL on your phone. Ctrl-C stops the bridge too.
 
-Exposure: everything the app can do, to every device on your LAN, with no
-authentication. It controls a 600 F heater. Trusted networks only, never
-port-forwarded.
+Exposure: this controls a 600 F heater, so it is not open by default.
+
+  * binds 127.0.0.1 unless --lan is given;
+  * requires a token on every request and on the WebSocket upgrade, generated
+    per run and printed in the URL, or supplied with --token.
+
+A LAN listener without a token would hand full device control to every device
+on the network, which is not something a URL should be able to do by accident.
 """
 
 from __future__ import annotations
@@ -23,6 +28,8 @@ import argparse
 import asyncio
 import base64
 import hashlib
+import hmac
+import secrets
 import socket
 import struct
 import subprocess
@@ -75,7 +82,8 @@ def resolve(path: str) -> Path | None:
 
 def http_response(status: int, body: bytes, ctype="text/plain; charset=utf-8",
                   extra: dict | None = None) -> bytes:
-    reason = {200: "OK", 400: "Bad Request", 404: "Not Found",
+    reason = {200: "OK", 400: "Bad Request", 401: "Unauthorized",
+              403: "Forbidden", 404: "Not Found",
               502: "Bad Gateway"}.get(status, "ERROR")
     head = [f"HTTP/1.1 {status} {reason}",
             f"Content-Type: {ctype}",
@@ -158,7 +166,40 @@ async def _send_frame(writer, msg) -> None:
     await writer.drain()
 
 
-async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+COOKIE = "peak_t"
+
+
+def _cookies(headers: dict) -> dict:
+    out = {}
+    for part in headers.get("cookie", "").split(";"):
+        k, _, v = part.strip().partition("=")
+        if k:
+            out[k] = v
+    return out
+
+
+def authorised(query: dict, headers: dict, token: str) -> bool:
+    """Token from the query string, a Bearer header, or the session cookie.
+
+    The query string is what the printed URL uses, because a phone opening a
+    link cannot set headers. The cookie is what makes the *sub-resources* work:
+    `app.js` and `app.css` are requested without the page's query string, so
+    without it the page would load and then 401 every asset it needs.
+
+    Comparison is constant time and the token is per run.
+    """
+    got = query.get("t") or ""
+    if not got:
+        auth = headers.get("authorization", "")
+        if auth.lower().startswith("bearer "):
+            got = auth[7:].strip()
+    if not got:
+        got = _cookies(headers).get(COOKIE, "")
+    return bool(got) and hmac.compare_digest(got, token)
+
+
+async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter,
+                 token: str = "") -> None:
     try:
         raw = await reader.readuntil(b"\r\n\r\n")
     except Exception:
@@ -183,6 +224,26 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> 
         await writer.drain()
         writer.close()
         return
+
+    raw_path, _, raw_query = path.partition("?")
+    query = {}
+    for pair in raw_query.split("&"):
+        if not pair:
+            continue
+        k, _, v = pair.partition("=")
+        query[k] = v
+
+    if token and not authorised(query, headers, token):
+        writer.write(http_response(401, b"token required: open the URL this tool printed\n"))
+        await writer.drain()
+        writer.close()
+        return
+
+    # The token arrived, so remember it for this origin. Sub-resource requests
+    # carry no query string of their own.
+    session = {}
+    if token and _cookies(headers).get(COOKIE) != token:
+        session["Set-Cookie"] = f"{COOKIE}={token}; Path=/; SameSite=Strict"
 
     # ---- WebSocket bridge ----
     if headers.get("upgrade", "").lower() == "websocket":
@@ -217,10 +278,10 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> 
         return
 
     # ---- static files ----
-    if path == "/health":
+    if raw_path == "/health":
         body, ctype = b"ok\n", "text/plain; charset=utf-8"
     else:
-        target = resolve(path)
+        target = resolve(raw_path)
         if target is None:
             body, ctype = b"not found\n", "text/plain; charset=utf-8"
             writer.write(http_response(404, body, ctype))
@@ -229,16 +290,16 @@ async def handle(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> 
             return
         body = target.read_bytes()
         ctype = TYPES.get(target.suffix, "application/octet-stream")
-    writer.write(http_response(200, body, ctype))
+    writer.write(http_response(200, body, ctype, session))
     await writer.drain()
     writer.close()
 
 
-def banner(ip: str, port: int) -> None:
-    url = f"http://{ip}:{port}/app.html?bridge=1"
+def banner(ip: str, port: int, token: str) -> None:
+    url = f"http://{ip}:{port}/app.html?bridge=1&t={token}"
     print()
     print("  " + "=" * 70)
-    print("   Peak app on your LAN — full device control, no authentication")
+    print("   Peak app — full device control, token required")
     print("  " + "=" * 70)
     print(f"   {url}")
     print()
@@ -249,7 +310,8 @@ def banner(ip: str, port: int) -> None:
     print("   rule: plain http on a LAN IP is not a secure context in Chrome")
     print("   for Android. Tell me and I will front it with HTTPS.")
     print()
-    print("   Anyone on this network can start a 600 F session. Ctrl-C stops.")
+    print("   The token is in the URL above; it changes every run. Anyone who")
+    print("   has that URL can start a 600 F session. Ctrl-C stops.")
     print("  " + "=" * 70)
     print()
 
@@ -263,8 +325,11 @@ async def main_async(args) -> int:
     if bridge.poll() is not None:
         print("the BLE bridge exited immediately — run tools/bridge.py alone to see why")
         return 1
-    server = await asyncio.start_server(handle, "0.0.0.0", args.port)
-    banner(lan_ip(), args.port)
+    host = "0.0.0.0" if args.lan else "127.0.0.1"
+    server = await asyncio.start_server(
+        lambda r, w: handle(r, w, args.token), host, args.port)
+    shown = lan_ip() if args.lan else "127.0.0.1"
+    banner(shown, args.port, args.token)
     try:
         async with server:
             await server.serve_forever()
@@ -285,7 +350,12 @@ def main() -> int:
     ap = argparse.ArgumentParser(description="LAN tunnel for the Peak app + BLE bridge")
     ap.add_argument("--addr", required=True, help="Peak MAC")
     ap.add_argument("--port", type=int, default=8791)
+    ap.add_argument("--lan", action="store_true",
+                    help="listen on the LAN as well as loopback (needs the token)")
+    ap.add_argument("--token", default=None,
+                    help="access token; generated per run when omitted")
     args = ap.parse_args()
+    args.token = args.token or secrets.token_urlsafe(16)
     try:
         return asyncio.run(main_async(args))
     except KeyboardInterrupt:
