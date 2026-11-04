@@ -8,7 +8,8 @@
 
 import { Device, P, STATE, CHARGE, CHAMBER, LANTERN_MODE, IN_SESSION } from './device.js';
 import { TYPE } from './proto/lorax.js';
-import { supported, pickDevice, BleTransport, BluetoothUnavailable, BridgeTransport, bridgeAvailable } from './ble.js';
+import { supported, pickDevice, BleTransport, BluetoothUnavailable, BridgeTransport, bridgeAvailable,
+         bridgeMixedContent, BRIDGE_URL } from './ble.js';
 import { createFakeLorax } from './fake_lorax.js';
 import { adaptDevice } from './governor-adapter.js';
 import './curves-data.js';      // defines window.interpolateCurveTarget
@@ -125,6 +126,18 @@ async function connectReal() {
     /* ?bridge=1 routes through tools/bridge.py instead of Web Bluetooth. Same
      * transport interface, so the protocol layer and the UI are untouched. */
     if (bridgeAvailable()) {
+      /* Say why it cannot work, rather than waiting for a socket that the
+       * browser has already refused. */
+      if (bridgeMixedContent()) {
+        /* Fatal configuration problem, not a transient one: put the fix on the
+         * connect screen where it stays readable, and keep the detail in the
+         * toast. */
+        $('#cxSub').textContent = 'HTTPS page cannot reach a ws:// bridge — open the tunnel URL instead';
+        throw new Error(
+          'This page is served over HTTPS, so the browser blocks ws:// to ' + BRIDGE_URL + '. '
+          + 'Run tools/tunnel.py --addr <MAC> --lan and open the URL it prints; that serves the '
+          + 'app and the bridge from one http origin.');
+      }
       $('#cxSub').textContent = 'Connecting to the bridge';
       const transport = new BridgeTransport();
       await transport.connect();
@@ -150,7 +163,8 @@ async function connectReal() {
     await attach();
   } catch (e) {
     if (e && e.name === 'NotFoundError') { $('#cxSub').textContent = 'Searching'; return; }
-    $('#cxSub').textContent = 'Not connected';
+    /* A message that already explains itself stays on the screen. */
+    if (!/^HTTPS page/.test($('#cxSub').textContent)) $('#cxSub').textContent = 'Not connected';
     toast(e.message || String(e), 'err');
   }
 }

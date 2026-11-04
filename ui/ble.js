@@ -179,10 +179,19 @@ export class BleTransport {
  * still be unable to reach the device without it. */
 const _bp = new URLSearchParams(location.search);
 const _bport = _bp.get('port') || 8792;
-const _bhost = _bp.get('bhost')
-  || (location.protocol === 'https:' && !location.port ? location.hostname : (location.hostname || '127.0.0.1'));
+/* The bridge runs on the machine with the Bluetooth radio, which is the page's
+ * own host only when the page is served from that machine. A page loaded from
+ * somewhere else (Pages, a tunnel on another host) has to be told. */
+const _bhost = _bp.get('bhost') || (location.hostname || '127.0.0.1');
 const _btoken = _bp.get('t');
 export const BRIDGE_URL = `ws://${_bhost}:${_bport}${_btoken ? '/?t=' + encodeURIComponent(_btoken) : ''}`;
+
+/* An HTTPS page cannot open a ws:// socket: the browser blocks it as mixed
+ * content before a byte is sent. This is not a device or bridge problem, so say
+ * so plainly instead of letting the connect hang. */
+export function bridgeMixedContent() {
+  return location.protocol === 'https:' && BRIDGE_URL.startsWith('ws://');
+}
 
 export function bridgeAvailable() {
   return new URLSearchParams(location.search).has('bridge');

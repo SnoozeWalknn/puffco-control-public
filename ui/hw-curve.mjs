@@ -68,7 +68,9 @@ await page.addInitScript(([t, l]) => {
   localStorage.setItem('puffco.lenS', String(l));
 }, [TEMP_F, LEN_S]);
 
-await page.goto(`http://127.0.0.1:8796/app.html?bridge=1&addr=${encodeURIComponent(addr)}`);
+const base = process.env.APP_BASE || 'http://127.0.0.1:8796';
+const token = process.env.APP_TOKEN || '';
+await page.goto(`${base}/app.html?bridge=1&addr=${encodeURIComponent(addr)}${token ? '&t=' + token : ''}`);
 await page.waitForTimeout(400);
 await page.click('#cxGo');
 
@@ -82,7 +84,19 @@ async function waitFor(fn, ms, label) {
   throw new Error('timeout waiting for ' + label);
 }
 
-await waitFor(async () => (await page.evaluate(() => window.__S?.pollTicks || 0)) >= 2, 40000, 'first polls');
+try {
+  await waitFor(async () => (await page.evaluate(() => window.__S?.pollTicks || 0)) >= 2, 40000, 'first polls');
+} catch (e) {
+  const diag = await page.evaluate(() => ({
+    sub: document.querySelector('#cxSub')?.textContent,
+    connected: window.__puffco?.()?.connected,
+    screen: window.__S?.screen,
+  }));
+  say('\nCOULD NOT CONNECT: ' + JSON.stringify(diag));
+  say(consoleLog.slice(-10).join('\n'));
+  await browser.close();
+  process.exit(5);
+}
 
 const before = await snap();
 say('\n=== BEFORE ===');
