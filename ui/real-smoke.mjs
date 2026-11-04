@@ -31,7 +31,8 @@ const logs = [];
 page.on('console', m => logs.push(m.type() + ': ' + m.text()));
 page.on('pageerror', e => logs.push('pageerror: ' + e.message));
 
-await page.goto(`http://127.0.0.1:8796/app.html?bridge=1&addr=${encodeURIComponent(addr)}`);
+const base = process.env.APP_BASE || 'http://127.0.0.1:8796';
+await page.goto(`${base}/app.html?bridge=1&addr=${encodeURIComponent(addr)}`);
 await page.waitForTimeout(500);
 await page.click('#cxGo');
 
