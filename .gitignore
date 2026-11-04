@@ -1,0 +1,30 @@
+# Third-party material that is NOT ours and must never be committed:
+# the decompiled Puffco bundle, and the community libraries used as reference.
+reference/
+
+# dependencies
+node_modules/
+
+# generated screenshots (regenerate with: node ui/shots.mjs)
+ui/shots/
+
+# editor / OS noise
+*.log
+.DS_Store
+.vscode/
+
+# python bytecode
+__pycache__/
+*.pyc
+
+# hardware run logs (local data, not for the repo)
+runs/
+
+# local dev symlinks (deps and venv live in the private tree)
+/.venv
+/node_modules
+
+# local secrets: the vendor handshake constants are never committed
+/tools/handshake.key
+/ui/handshake.local.js
+/PLAN-CURVE-MERGE.md

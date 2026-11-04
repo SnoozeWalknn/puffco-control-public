@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#08080a">
+<title>Puffco</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='%23ff7a45'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<!-- ============================ CONNECT ============================ -->
+<section class="scr on" id="sc-connect">
+  <header class="hdr">
+    <div><h1>Connect</h1><div class="sub" id="cxSub">Searching</div></div>
+    <div class="pill" id="cxPill"><span class="dot"></span><span id="cxPillTxt">Scanning</span></div>
+  </header>
+
+  <div class="scan"><div class="ring r1"></div><div class="ring r2"></div><div class="ring r3"></div><div class="core"></div></div>
+
+  <div id="cxDevices"></div>
+
+  <div class="sect" id="cxPairSect">Pairing</div>
+  <div class="card tight" style="padding:13px 12px">
+    <div class="steps3">
+      <div><div class="n">1</div><div class="t">Hold power<br>5 seconds</div></div>
+      <div><div class="n">2</div><div class="t">Logo glows<br>blue</div></div>
+      <div><div class="n">3</div><div class="t">Tap Connect</div></div>
+    </div>
+  </div>
+
+  <div class="hint">
+    <div class="i">i</div>
+    <p>Firmware X and later locks reads and writes behind a handshake. This app performs it silently, then verifies it with a real read before claiming success.</p>
+  </div>
+
+  <div class="sect">What you get</div>
+  <div class="card tight" style="padding:2px 15px">
+    <div class="kv"><span>Live chamber graph</span><b style="font-size:10.5px;color:var(--ok)">with history</b></div>
+    <div class="kv"><span>Temperature curves</span><b style="font-size:10.5px;color:var(--ok)">6 shapes</b></div>
+    <div class="kv"><span>Heater power · coil Ω</span><b style="font-size:10.5px;color:var(--ok)">readout</b></div>
+    <div class="kv"><span>Lantern · profiles · counters</span><b style="font-size:10.5px;color:var(--ok)">full</b></div>
+  </div>
+
+  <div class="spacer"></div>
+  <a href="#models-progress-widget.md" class="widget-link" title="Models Progress &amp; Confidence Plugin (snapshot 2026-11-03T19:45:57-05:00 EDT)">Models Progress &amp; Confidence Plugin</a>
+
+  <button class="btn primary" id="cxGo">Connect</button>
+  <button class="btn ghost small" id="cxDemo" style="margin-top:8px">Try the simulator</button>
+</section>
+
+<!-- ============================== HEAT ============================== -->
+<section class="scr" id="sc-heat">
+  <header class="hdr">
+    <div><h1>Heat</h1><div class="sub" id="hxSub">Idle</div></div>
+    <div class="pill" id="hxPill"><span class="dot"></span><span id="hxPillTxt">Ready</span></div>
+  </header>
+
+  <div class="graphcard">
+    <div class="ghead"><div class="t">Chamber</div><div class="v" id="hxSpan">2 min</div></div>
+    <div class="hero"><div class="n" id="hxNow">--<sup>&deg;F</sup></div><div class="s" id="hxTrend">no reading</div></div>
+    <canvas class="plot" id="hxPlot" width="652" height="300"></canvas>
+    <div class="xaxis"><span id="hxAxisL">-2 min</span><span>now</span></div>
+  </div>
+
+  <div class="stepper">
+    <div class="lb">Temperature</div>
+    <button class="disc" data-temp="-1" aria-label="Lower temperature">&minus;</button>
+    <b id="hxTemp">515<u>&deg;F</u></b>
+    <button class="disc" data-temp="1" aria-label="Raise temperature">+</button>
+  </div>
+  <div class="stepper">
+    <div class="lb">Session length</div>
+    <button class="disc" data-len="-5" aria-label="Shorter">&minus;</button>
+    <b id="hxLen">60<u>s</u></b>
+    <button class="disc" data-len="5" aria-label="Longer">+</button>
+  </div>
+
+  <div class="chips" id="hxChips"></div>
+
+  <div class="card tight" style="margin-top:8px;padding:11px 15px" id="hxLast">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px">
+      <div class="cap">Last session</div><div style="font-size:9px;color:var(--dim)" id="hxLastWhen">&mdash;</div>
+    </div>
+    <div style="display:flex;gap:16px;font-size:10.5px;color:var(--mut2)" id="hxLastBody"></div>
+  </div>
+
+  <div class="spacer"></div>
+  <button class="btn primary" id="hxStart">Start session</button>
+  <div class="row2" style="margin-top:8px">
+    <button class="btn ghost small" data-go="curves">Curve&hellip;</button>
+    <button class="btn ghost small" data-go="mood">Mood light</button>
+  </div>
+</section>
+
+<!-- ============================ SESSION ============================ -->
+<section class="scr" id="sc-session">
+  <header class="hdr">
+    <div><h1>Session</h1><div class="sub" id="ssSub">Running</div></div>
+    <div class="pill" id="ssPill"><span class="dot ember"></span><span id="ssPillTxt">0:00</span></div>
+  </header>
+
+  <div class="graphcard">
+    <div class="ghead">
+      <div class="t">Chamber</div>
+      <div class="v" style="display:flex;gap:12px;align-items:baseline">
+        <span><i style="display:inline-block;width:10px;height:2px;background:#ff7a45;border-radius:2px;vertical-align:middle;margin-right:4px"></i>actual</span>
+        <span><i style="display:inline-block;width:10px;height:2px;background:#c9baff;border-radius:2px;vertical-align:middle;margin-right:4px"></i>target</span>
+      </div>
+    </div>
+    <div class="hero"><div class="n" id="ssNow">--<sup>&deg;F</sup></div><div class="s" id="ssTarget">&mdash;</div></div>
+    <canvas class="plot" id="ssPlot" width="652" height="300"></canvas>
+    <div class="xaxis"><span id="ssAxisL">-30 s</span><span>now</span></div>
+  </div>
+
+  <div class="card tight" id="ssCurveCard" hidden>
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+      <div class="cap">Curve</div><div style="font-size:9.5px;color:var(--mut2)" class="mono" id="ssCurveT">0 / 0 s</div>
+    </div>
+    <div class="bar"><b id="ssCurveBar" style="width:0%"></b><i id="ssCurveMark" style="left:0"></i></div>
+    <div style="display:flex;justify-content:space-between;margin-top:7px;font-size:9px;color:var(--dim)" id="ssCurveNote"></div>
+  </div>
+
+  <div class="stat3">
+    <div><b class="mono" id="ssPower">&mdash;</b><i>Heater</i></div>
+    <div><b class="mono" id="ssLeft">&mdash;</b><i>Left</i></div>
+    <div><b class="mono" id="ssLag">&mdash;</b><i>Lag</i></div>
+  </div>
+
+  <div class="sect">This session</div>
+  <div class="card tight" style="padding:2px 15px">
+    <div class="kv"><span>Started at</span><b class="mono" id="ssStart">&mdash;</b></div>
+    <div class="kv"><span>Curve writes</span><b class="mono" id="ssWrites">&mdash;</b></div>
+    <div class="kv"><span>Peak reached</span><b class="mono" id="ssPeak">&mdash;</b></div>
+  </div>
+
+  <div class="spacer"></div>
+  <div class="row2">
+    <button class="btn primary" id="ssBoost">+10&deg;F Boost</button>
+    <button class="btn ghost" id="ssAbort">Abort</button>
+  </div>
+</section>
+
+<!-- ============================= CURVES ============================= -->
+<section class="scr" id="sc-curves">
+  <header class="hdr">
+    <div><h1>Curves</h1><div class="sub" id="cvSub">Hill &middot; 90 s</div></div>
+    <button class="pill" id="cvSave">Save</button>
+  </header>
+
+  <div class="modes grid3" id="cvModes"></div>
+
+  <div class="editor">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;padding:0 3px 6px">
+      <div class="cap">Chamber temperature</div><div style="font-size:9px;color:var(--dim)" class="mono" id="cvRange">400&ndash;644 &deg;F</div>
+    </div>
+    <canvas id="cvPlot" width="652" height="292"></canvas>
+    <div class="legend"><span><i class="sw-v"></i>commanded</span><span id="cvLegendPhys"><i class="sw-e"></i>what the coil can reach</span></div>
+  </div>
+
+  <div class="warnbar" id="cvWarn">
+    <div class="ic" id="cvWarnIc">!</div>
+    <p id="cvWarnTxt"></p>
+  </div>
+
+  <div class="stepper">
+    <div class="lb">Curve length</div>
+    <button class="disc" data-clen="-10" aria-label="Shorter">&minus;</button>
+    <b id="cvLen">90<u>s</u></b>
+    <button class="disc" data-clen="10" aria-label="Longer">+</button>
+  </div>
+
+  <div class="sect">Saved</div>
+  <div class="modes" id="cvSaved"></div>
+
+  <div class="sect" style="margin-top:10px">How it runs</div>
+  <div class="card tight" style="padding:2px 15px">
+    <div class="kv"><span>Runs on this phone</span><b style="font-size:10.5px">offset, 1 / s</b></div>
+    <div class="kv"><span>Link drops</span><b style="font-size:10.5px;color:var(--warn)">holds last</b></div>
+  </div>
+
+  <button class="btn primary" id="cvRun" style="flex:0 0 auto;margin-top:12px">Run with session</button>
+</section>
+
+<!-- ============================ PROFILES ============================ -->
+<section class="scr" id="sc-profiles">
+  <header class="hdr">
+    <div><h1>Profiles</h1><div class="sub" id="pfSub">&mdash;</div></div>
+    <button class="pill" id="pfNew">+ New</button>
+  </header>
+
+  <div class="pgrid" id="pfGrid"></div>
+
+  <div class="sect">On device</div>
+  <div class="card tight" id="pfCurrent"></div>
+
+  <div class="sect">Selected</div>
+  <div class="card tight" style="padding:2px 15px">
+    <div class="kv"><span>Temperature</span><b class="mono" id="pfTemp">&mdash;</b></div>
+    <div class="kv"><span>Time</span><b class="mono" id="pfTime">&mdash;</b></div>
+    <div class="kv"><span>Boost</span><b class="mono" id="pfBoost">&mdash;</b></div>
+    <div class="kv"><span>Curve</span><b id="pfCurve" style="font-size:10.5px">&mdash;</b></div>
+  </div>
+
+  <div class="sect" style="margin-top:10px">Actions</div>
+  <div class="card tight" style="padding:2px 15px">
+    <button class="kv" id="pfWrite"><span>Save to device</span><b class="ember">&rsaquo;</b></button>
+    <button class="kv" id="pfArchive"><span>Archive</span><b style="font-size:10px;color:var(--dim)" id="pfArchiveN">0</b></button>
+  </div>
+
+  <div class="spacer"></div>
+  <button class="btn ghost small" id="pfEdit">Edit selected profile</button>
+</section>
+
+<!-- ============================== MOOD ============================== -->
+<section class="scr" id="sc-mood">
+  <header class="hdr">
+    <div><h1>Mood</h1><div class="sub" id="mdSub">Lantern</div></div>
+    <div class="pill" id="mdPill"><span class="dot"></span><span id="mdPillTxt">Off</span></div>
+  </header>
+
+  <div class="orb"><div class="glow" id="mdOrb"></div><div class="hi"></div></div>
+
+  <div class="swatches" id="mdColors"></div>
+
+  <div class="card tight" style="padding:3px 15px" id="mdBri"></div>
+
+  <div class="sect">Pattern</div>
+  <div class="modes grid3" id="mdPatterns"></div>
+
+  <div class="stepper">
+    <div class="lb">Auto off</div>
+    <button class="disc" data-mtime="-1" aria-label="Shorter">&minus;</button>
+    <b id="mdTime">2<u>h</u></b>
+    <button class="disc" data-mtime="1" aria-label="Longer">+</button>
+  </div>
+
+  <div class="sect" style="margin-top:10px">Lantern</div>
+  <div class="card tight" style="padding:2px 15px">
+    <div class="kv"><span>Remaining</span><b class="mono" id="mdRemaining" style="font-size:10.5px">&mdash;</b></div>
+    <div class="kv"><span>Speed</span><b id="mdPattern" style="font-size:10.5px">&mdash;</b></div>
+  </div>
+
+  <div class="spacer"></div>
+  <button class="btn ghost small" id="mdToggle">Turn on</button>
+</section>
+
+<!-- ============================== PEAK ============================== -->
+<section class="scr" id="sc-peak">
+  <header class="hdr">
+    <div><h1>Peak</h1><div class="sub" id="pkSub">&mdash;</div></div>
+    <button class="pill" id="pkDisconnectTop">Disconnect</button>
+  </header>
+
+  <div class="card tight" style="padding:12px 15px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">
+      <div class="cap">Battery</div><div style="font-size:9px;color:var(--dim)" id="pkCharge">&mdash;</div>
+    </div>
+    <div class="batt"><div class="n" id="pkSoc">--<span>%</span></div><div class="battbar"><b id="pkBar"></b><i></i></div></div>
+  </div>
+
+  <div class="grid2" style="margin-top:8px">
+    <div class="mini"><b id="pkTotal">&mdash;</b><i>Total dabs</i></div>
+    <div class="mini"><b id="pkTrip">&mdash;</b><i>Trip dabs</i></div>
+    <div class="mini"><b id="pkPerDay">&mdash;</b><i>Per day</i></div>
+    <div class="mini"><b id="pkRemaining">&mdash;</b><i>Remaining</i></div>
+  </div>
+
+  <div class="sect">Heater</div>
+  <div class="card tight" style="padding:2px 15px">
+    <div class="kv"><span>Power</span><b class="mono" id="pkPower">&mdash;</b></div>
+    <div class="kv"><span>Resistance</span><b class="mono" id="pkOhm">&mdash;</b></div>
+    <div class="kv"><span>Duty · chamber</span><b class="mono" id="pkDuty">&mdash;</b></div>
+  </div>
+
+  <div class="sect">Device</div>
+  <div class="card tight" style="padding:2px 15px">
+    <div class="kv"><span>Firmware</span><b class="mono" id="pkFw">&mdash;</b></div>
+    <div class="kv"><span>Serial</span><b class="mono" id="pkSerial">&mdash;</b></div>
+    <div class="kv"><span>Uptime · stealth</span><b class="mono" id="pkUptime">&mdash;</b></div>
+  </div>
+
+  <div class="modes" style="padding:10px 0 0">
+    <div class="mode" data-unit="F">Fahrenheit</div>
+    <div class="mode" data-unit="C">Celsius</div>
+  </div>
+
+  <div class="hint" style="margin-top:10px">
+    <div class="i">i</div>
+    <p>Writes session, setpoint offset and profile slots 0–3. Heater tuning stays locked; factory reset is not exposed.</p>
+  </div>
+
+  <div class="spacer"></div>
+  <button class="btn ghost small" id="pkDisconnect">Forget device</button>
+</section>
+
+<!-- ============================ TAB BAR ============================ -->
+<nav class="tabs" id="tabs" hidden>
+  <button class="tab on" data-go="heat"><svg viewBox="0 0 24 24"><path d="M12 3.2v3.6M12 17.2v3.6M3.2 12h3.6M17.2 12h3.6"/><circle cx="12" cy="12" r="4.2"/></svg><span>Heat</span></button>
+  <button class="tab" data-go="curves"><svg viewBox="0 0 24 24"><path d="M3.2 17.4 8 10.6l3.9 3.9 3.9-5.8 4.9 8.7"/></svg><span>Curves</span></button>
+  <button class="tab" data-go="profiles"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="6.6" height="6.6" rx="2"/><rect x="13.4" y="4" width="6.6" height="6.6" rx="2"/><rect x="4" y="13.4" width="6.6" height="6.6" rx="2"/><rect x="13.4" y="13.4" width="6.6" height="6.6" rx="2"/></svg><span>Profiles</span></button>
+  <button class="tab" data-go="mood"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.4v2.8M12 18.8v2.8M2.4 12h2.8M18.8 12h2.8M5.2 5.2l2 2M16.8 16.8l2 2M18.8 5.2l-2 2M7.2 16.8l-2 2"/></svg><span>Mood</span></button>
+  <button class="tab" data-go="peak"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.2"/><path d="M12 7.6V12l3 1.9"/></svg><span>Peak</span></button>
+</nav>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- Local handshake keys. Gitignored and absent on a fresh clone; a missing
+     file is not an error, it just leaves the placeholder in place. -->
+<script src="handshake.local.js" onerror="void 0"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
